@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BC Prospect Map Helper</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Arial, sans-serif; background: #1a1a2e; color: #eee; min-height: 100vh; }
+        header { background: #16213e; padding: 16px 24px; display: flex; align-items: center; gap: 12px; border-bottom: 2px solid #e94560; }
+        header h1 { font-size: 1.4rem; color: #e94560; }
+        header span { font-size: 0.85rem; color: #aaa; }
+        .container { max-width: 900px; margin: 40px auto; padding: 0 20px; }
+        .hero { text-align: center; margin-bottom: 40px; }
+        .hero h2 { font-size: 2rem; color: #e94560; margin-bottom: 10px; }
+        .hero p { color: #aaa; font-size: 1rem; }
+        .search-box { background: #16213e; border-radius: 10px; padding: 30px; margin-bottom: 30px; }
+        .search-box h3 { color: #e94560; margin-bottom: 15px; }
+        .form-row { display: flex; gap: 10px; }
+        input[type="text"] { flex: 1; padding: 10px 14px; border-radius: 6px; border: 1px solid #444; background: #0f3460; color: #eee; font-size: 1rem; }
+        button { padding: 10px 20px; background: #e94560; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 1rem; font-weight: bold; }
+        .results { background: #16213e; border-radius: 10px; padding: 25px; margin-bottom: 30px; display: none; }
+        .results h3 { color: #e94560; margin-bottom: 15px; }
+        .indicator-list { list-style: none; margin-bottom: 15px; }
+        .indicator-list li { padding: 6px 0; border-bottom: 1px solid #2a2a4a; color: #ccc; }
+        .tips { background: #0f3460; border-radius: 6px; padding: 12px 16px; color: #aad4f5; font-style: italic; margin-bottom: 15px; }
+        .action-row { display: flex; gap: 10px; flex-wrap: wrap; }
+        .btn-secondary { background: #0f3460; }
+        .upload-section { background: #16213e; border-radius: 10px; padding: 25px; margin-bottom: 30px; }
+        .upload-section h3 { color: #e94560; margin-bottom: 15px; }
+        .upload-area { border: 2px dashed #444; border-radius: 8px; padding: 30px; text-align: center; color: #888; }
+        input[type="file"] { margin-top: 10px; color: #ccc; }
+        .links { display: flex; gap: 15px; justify-content: center; flex-wrap: wrap; margin-top: 30px; }
+        .links a { color: #aad4f5; text-decoration: none; padding: 8px 16px; border: 1px solid #444; border-radius: 6px; }
+        .error { color: #e94560; padding: 10px; }
+        .map-btn { display: inline-block; margin-top: 20px; padding: 12px 28px; background: #e94560; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>BC Prospect Map Helper</h1>
+        <span>Offline/Online Prospecting and Rockhounding for British Columbia</span>
+    </header>
+    <div class="container">
+        <div class="hero">
+            <h2>Find Your Next Prospect</h2>
+            <p>Search BC locations for gold, minerals, and rockhounding indicators.</p>
+            <a href="/map" class="map-btn">Open Interactive Map</a>
+        </div>
+        <div class="search-box">
+            <h3>Search a BC Location</h3>
+            <div class="form-row">
+                <input type="text" id="locationInput" placeholder="e.g. Princeton, Oliver, Barkerville..." />
+                <button onclick="searchLocation()">Search</button>
+            </div>
+        </div>
+        <div class="results" id="results">
+            <h3 id="resultTitle">Results</h3>
+            <p style="color:#aaa;margin-bottom:10px;">Mineral Indicators:</p>
+            <ul class="indicator-list" id="indicatorList"></ul>
+            <div class="tips" id="tipsBox"></div>
+            <div class="action-row">
+                <button class="btn-secondary" onclick="downloadMap()">Download Offline Map Package</button>
+                <a href="/map" class="map-btn" style="padding:10px 18px;font-size:0.9rem;">View on Map</a>
+            </div>
+        </div>
+        <div class="upload-section">
+            <h3>Upload Field Notes</h3>
+            <div class="upload-area">
+                <p>Upload your field notes (JSON, CSV, TXT)</p>
+                <input type="file" id="notesFile" accept=".json,.csv,.txt" /><br><br>
+                <button onclick="uploadNotes()">Upload Notes</button>
+            </div>
+            <p id="uploadMsg" style="margin-top:10px;color:#aad4f5;"></p>
+        </div>
+        <div class="links">
+            <a href="https://maps.gov.bc.ca/ess/sv/imapbc/" target="_blank">iMapBC</a>
+            <a href="https://www.avenzamaps.com/" target="_blank">Avenza Maps</a>
+            <a href="https://www2.gov.bc.ca/gov/content/industry/mineral-exploration-mining/mineral-titles" target="_blank">Mineral Titles</a>
+            <a href="/map">Interactive Map</a>
+        </div>
+    </div>
+    <script>
+        var currentLocation = '';
+        async function searchLocation() {
+            var loc = document.getElementById('locationInput').value.trim();
+            if (!loc) return;
+            currentLocation = loc;
+            var fd = new FormData(); fd.append('location', loc);
+            try {
+                var res = await fetch('/search', {method:'POST', body:fd});
+                var data = await res.json();
+                document.getElementById('resultTitle').textContent = data.location;
+                document.getElementById('indicatorList').innerHTML = data.indicators.map(function(i){return '<li>'+i+'</li>';}).join('');
+                document.getElementById('tipsBox').textContent = data.tips;
+                document.getElementById('results').style.display = 'block';
+            } catch(e) {
+                document.getElementById('results').innerHTML = '<p class="error">Error fetching data.</p>';
+                document.getElementById('results').style.display = 'block';
+            }
+        }
+        async function downloadMap() {
+            var fd = new FormData(); fd.append('location', currentLocation||'Princeton');
+            var res = await fetch('/download_map',{method:'POST',body:fd});
+            var blob = await res.blob();
+            var url = window.URL.createObjectURL(blob);
+            var a = document.createElement('a'); a.href=url; a.download=(currentLocation||'Princeton')+'_prospect_map.txt'; a.click();
+        }
+        async function uploadNotes() {
+            var file = document.getElementById('notesFile').files[0];
+            if (!file){document.getElementById('uploadMsg').textContent='Select a file first.';return;}
+            var fd = new FormData(); fd.append('file', file);
+            try {
+                var res = await fetch('/upload_notes',{method:'POST',body:fd});
+                var data = await res.json();
+                document.getElementById('uploadMsg').textContent = data.message||'Uploaded!';
+            } catch(e){document.getElementById('uploadMsg').textContent='Upload failed.';}
+        }
+        document.addEventListener('DOMContentLoaded',function(){
+            document.getElementById('locationInput').addEventListener('keypress',function(e){if(e.key==='Enter')searchLocation();});
+        });
+    </script>
+</body>
+</html>
